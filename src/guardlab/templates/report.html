@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Red-Team Lab Report</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #0b1020; color: #e7eaf3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1050px; margin: 0 auto; padding: 48px 24px 90px; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .18em; color: #7ee3c2; font-size: 12px; font-weight: 700; }
+    h1 { font-size: clamp(30px, 5vw, 52px); margin: 12px 0; line-height: 1.05; }
+    h2 { font-size: 22px; margin: 0 0 18px; }
+    h3 { font-size: 17px; margin: 0 0 8px; }
+    p { line-height: 1.6; color: #b9c2d9; }
+    .lead { max-width: 700px; }
+    .muted { color: #91a0ba; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(165px,1fr)); gap: 12px; margin: 28px 0 40px; }
+    .metric, article { background: #151c30; border: 1px solid #2b3653; border-radius: 16px; }
+    .metric { padding: 18px; }
+    .metric strong { display: block; font-size: 30px; margin-bottom: 5px; color: #fff; }
+    .metric span { color: #aab8d1; font-size: 13px; }
+    article { padding: 24px; margin: 18px 0; }
+    .heading { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .tag { border-radius: 100px; background: #253357; color: #cbdcff; padding: 7px 11px; font-size: 12px; font-weight: 650; }
+    .tag.alert { background: #513a35; color: #ffd0aa; }
+    .tag.good { background: #173e35; color: #9ef0cc; }
+    .tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+    details { border-top: 1px solid #2b3653; padding: 16px 0; }
+    summary { cursor: pointer; color: #dce7fb; font-weight: 650; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1121; border: 1px solid #25304a; border-radius: 10px; padding: 14px; color: #d7e1f3; }
+    .turn { margin-top: 18px; padding: 16px; border: 1px solid #2c3955; border-radius: 12px; }
+    .error { color: #ffb8ab; }
+    footer { margin-top: 35px; font-size: 13px; color: #91a0ba; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Synthetic evaluation · Local report</div>
+  <h1>Red-Team Lab Report</h1>
+  <p class="lead">Guard classifications, simulated tool behavior, and what the user actually saw are recorded separately. A quality score is not an exploit outcome.</p>
+  <p class="muted">Run {{ report.id }} · {{ report.created_at.isoformat() }} · {{ report.status|title }}{% if report.deepteam_version %} · DeepTeam {{ report.deepteam_version }}{% endif %}</p>
+  <div class="grid">
+    <div class="metric"><strong>{{ summary.attempted }}</strong><span>Attempts</span></div>
+    <div class="metric"><strong>{{ summary.completed }}</strong><span>Completed</span></div>
+    <div class="metric"><strong>{{ summary.observed_exploits }}</strong><span>Observed objective exploits</span></div>
+    <div class="metric"><strong>{{ summary.unauthorized_admin_actions }}</strong><span>Simulated admin actions</span></div>
+    <div class="metric"><strong>{{ summary.cross_account_reads }}</strong><span>Cross-account reads</span></div>
+    <div class="metric"><strong>{{ summary.visible_canary_disclosures }}</strong><span>Visible canary disclosures</span></div>
+    <div class="metric"><strong>{{ summary.quality_points }}</strong><span>Quality points across {{ summary.quality_scored }} scored reports</span></div>
+  </div>
+  {% if report.errors %}<article><h2>Run errors</h2>{% for error in report.errors %}<p class="error">{{ error }}</p>{% endfor %}</article>{% endif %}
+  <h2>Attempts</h2>
+  {% for attack in report.attacks %}
+  <article>
+    <div class="heading"><div><div class="eyebrow">{{ attack.source }} · {{ attack.method }}</div><h2>{{ attack.objective|replace('_', ' ')|title }}</h2></div><span class="tag {% if attack.outcome.exploit_observed and not attack.error %}alert{% else %}good{% endif %}">{% if attack.error %}Incomplete{% elif attack.outcome.exploit_observed %}Observed exploit{% else %}No observed exploit{% endif %}</span></div>
+    <p>{{ attack.description }}</p>
+    <div class="tags">
+      {% if attack.outcome.input_blocked %}<span class="tag">Input blocked</span>{% endif %}
+      {% if attack.outcome.output_blocked %}<span class="tag">Output blocked</span>{% endif %}
+      {% if attack.outcome.unauthorized_admin_action %}<span class="tag alert">Simulated unauthorized admin action</span>{% endif %}
+      {% if attack.outcome.cross_account_read %}<span class="tag alert">Cross-account read</span>{% endif %}
+      {% if attack.outcome.visible_canary_disclosure %}<span class="tag alert">Canary visible to user</span>{% endif %}
+    </div>
+    <p class="muted">Assistant: {{ attack.assistant_model }} · Guard: {{ attack.guard_model }} · Judge: {{ attack.judge_model }}</p>
+    {% if attack.quality %}<p>Report quality: <strong>{{ attack.quality.total }}/5</strong> (complexity {{ attack.quality.complexity }}/2, uniqueness {{ attack.quality.uniqueness }}/1, demonstrated strength {{ attack.quality.exploit_strength }}/2). {{ attack.quality.reason }}</p>{% endif %}
+    {% if attack.judge_error %}<p class="error">Judge unavailable: {{ attack.judge_error }}</p>{% endif %}
+    {% if attack.error %}<p class="error">Attempt error: {{ attack.error }}</p>{% endif %}
+    <details><summary>Transcript and evidence ({{ attack.turns|length }} turns)</summary>
+      {% for turn in attack.turns %}
+      <div class="turn">
+        <h3>Turn {{ loop.index }}</h3>
+        <p class="muted">User message</p><pre>{{ turn.user }}</pre>
+        <p class="muted">Visible assistant reply</p><pre>{{ turn.visible_assistant }}</pre>
+        {% if turn.input_guard %}<p>Input guard: {{ 'safe' if turn.input_guard.safe else 'unsafe' }}{% if turn.input_guard.categories %} ({{ turn.input_guard.categories|join(', ') }}){% endif %}</p>{% endif %}
+        {% if turn.output_guard %}<p>Output guard: {{ 'safe' if turn.output_guard.safe else 'unsafe' }}{% if turn.output_guard.categories %} ({{ turn.output_guard.categories|join(', ') }}){% endif %}</p>{% endif %}
+        {% if turn.error %}<p class="error">{{ turn.error }}</p>{% endif %}
+        {% if turn.tool_events %}<details><summary>Simulated tool events ({{ turn.tool_events|length }})</summary>{% for event in turn.tool_events %}<p><strong>{{ event.name }}</strong> · {{ 'authorized' if event.authorized else 'unauthorized' }} · {{ 'executed in memory' if event.simulated_executed else 'not executed' }}</p><pre>{{ event.model_dump_json(indent=2) }}</pre>{% endfor %}</details>{% endif %}
+        {% if turn.raw_assistant and turn.raw_assistant != turn.visible_assistant %}<details><summary>Raw assistant response withheld by guard</summary><pre>{{ turn.raw_assistant }}</pre></details>{% endif %}
+      </div>
+      {% endfor %}
+    </details>
+  </article>
+  {% endfor %}
+  <footer>All accounts, canaries, and tool effects in this report are synthetic. No real-world access is implied.</footer>
+</main>
+</body>
+</html>
