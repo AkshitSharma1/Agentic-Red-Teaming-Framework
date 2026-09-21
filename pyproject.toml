@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llama-guard-redteam"
+version = "0.1.0"
+description = "Agentic red-teaming framework for LLM safety evaluation"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "deepteam==1.0.9",
+    "flask>=3.1,<4",
+    "jinja2>=3.1,<4",
+    "openai>=2.0,<3",
+    "pydantic>=2.10,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+llama-guard-redteam = "guardlab.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guardlab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
